@@ -1,4 +1,6 @@
 {
+    "sendAnonymousData": "No",
+    "useFipsEndpoint": true,
     "app": "npx ts-node --prefer-ts-exts bin/druid-infra.ts",
     "watch": {
         "include": ["**"],
@@ -33,6 +35,62 @@
         "@aws-cdk/aws-apigateway:disableCloudWatchRole": true,
         "@aws-cdk/core:enablePartitionLiterals": true,
         "@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": true,
-        "@aws-cdk/core:target-partitions": ["aws", "aws-cn"]
+        "@aws-cdk/core:target-partitions": ["aws", "aws-cn"],
+
+        "retainData": false,
+        "vpcCidr": "10.120.0.0/16",
+        "route53HostedZoneName": "aws-deepbi.com",
+        "route53HostedZoneId": "Z09151401MBKBAMEM47BN",
+        "druidDomain": "druiddev.aws-deepbi.com",
+        "druidVersion": "30.0.0",
+        "druidOperationPlatform": "ec2",
+        "druidClusterName": "dev",
+        "internetFacing": true,
+	"customAmi": {
+            "amd64": {
+                "name": "ubuntu-pro-fips-server/images/hvm-ssd/ubuntu-focal-20.04-amd64-pro-fips-server-20260520-7bc828d1-c072-4d33-a989-fbad50380cfb",
+                "owners": ["679593333241"]
+            }
+        },
+        "druidExtensions": [
+            "druid-hdfs-storage",
+            "druid-kafka-indexing-service",
+            "druid-datasketches",
+            "druid-kinesis-indexing-service",
+            "druid-avro-extensions",
+            "druid-parquet-extensions",
+            "druid-protobuf-extensions",
+            "druid-orc-extensions"
+        ],
+        "druidEc2Config": {
+            "master": {
+                "minNodes": 1,
+                "maxNodes": 1,
+                "instanceType": "t3.medium"
+            },
+            "query": {
+                "minNodes": 1,
+                "maxNodes": 1,
+                "instanceType": "t3.medium"
+            },
+            "data": {
+                "minNodes": 1,
+                "maxNodes": 1,
+                "segmentCacheVolumeSize": 100,
+                "instanceType": "t3.large"
+            },
+            "zookeeper": {
+                "minNodes": 3,
+                "maxNodes": 3,
+                "instanceType": "t3.small"
+            }
+        },
+        "druidMetadataStoreConfig": {
+            "metadataStoreType": "aurora",
+            "metadataStoreConfig": {
+                "rdsInstanceType": "t3.medium",
+                "rdsInstanceCount": 1
+            }
+        }
     }
 }

@@ -1,4 +1,6 @@
 {
+    "sendAnonymousData": "No",
+    "useFipsEndpoint": true,
     "app": "npx ts-node --prefer-ts-exts bin/druid-infra.ts",
     "watch": {
         "include": ["**"],
@@ -37,13 +39,21 @@
 
         "retainData": false,
         "vpcCidr": "10.120.0.0/16",
-        "route53HostedZoneName": "example.com",
-        "route53HostedZoneId": "Z0XXXXXXXXXXXXXX",
-        "druidDomain": "druid.example.com",
+        "route53HostedZoneName": "aws-deepbi.com",
+        "route53HostedZoneId": "Z09151401MBKBAMEM47BN",
+        "druidDomain": "druiddev.aws-deepbi.com",
         "druidVersion": "30.0.0",
-        "druidOperationPlatform": "eks",
+        "druidOperationPlatform": "ec2",
         "druidClusterName": "dev",
         "internetFacing": true,
+
+        "customAmi": {
+            "arm64": {
+                "name": "ubuntu/images/hvm-ssd/ubuntu-focal-20.04-arm64-server-*",
+                "owners": ["099720109477"]
+            }
+        },
+
         "druidExtensions": [
             "druid-hdfs-storage",
             "druid-kafka-indexing-service",
@@ -54,34 +64,27 @@
             "druid-protobuf-extensions",
             "druid-orc-extensions"
         ],
-        "druidEksConfig": {
-            "endpointAccess": "PUBLIC",
-            "clusterMasterPrincipalArn": "arn:aws:iam::<account id>:role/<role name>",
-            "capacityProviderType": "ec2",
-            "capacityProviderConfig": {
-                "master": {
-                    "minNodes": 3,
-                    "maxNodes": 3,
-                    "instanceType": "m5.xlarge"
-                },
-                "query": {
-                    "minNodes": 3,
-                    "maxNodes": 3,
-                    "instanceType": "m5.xlarge"
-                },
-                "data": {
-                    "minNodes": 3,
-                    "maxNodes": 3,
-                    "taskCacheVolumeSize": 300,
-                    "segmentCacheVolumeSize": 500,
-                    "instanceType": "m5.large"
-                },
-                "zookeeper": {
-                    "minNodes": 3,
-                    "maxNodes": 3,
-                    "rootVolumeSize": 50,
-                    "instanceType": "t3.medium"
-                }
+        "druidEc2Config": {
+            "master": {
+                "minNodes": 3,
+                "maxNodes": 3,
+                "instanceType": "t4g.medium"
+            },
+            "query": {
+                "minNodes": 3,
+                "maxNodes": 3,
+                "instanceType": "t4g.medium"
+            },
+            "data": {
+                "minNodes": 3,
+                "maxNodes": 3,
+                "segmentCacheVolumeSize": 100,
+                "instanceType": "t4g.large"
+            },
+            "zookeeper": {
+                "minNodes": 3,
+                "maxNodes": 3,
+                "instanceType": "t4g.small"
             }
         },
         "druidMetadataStoreConfig": {

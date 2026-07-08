@@ -42,7 +42,7 @@ keytool -importkeystore -destkeystore keystore.jks -srckeystore druid.p12 -srcst
 keytool -importcert -file ca.pem -alias druid -keystore truststore.jks -deststorepass $TLS_KEYSTORE_PASSWORD -noprompt
 
 # Clean up
-rm -rf druid.*
-rm -rf ca.*
+#rm -rf druid.*
+#rm -rf ca.*
 
 cd -

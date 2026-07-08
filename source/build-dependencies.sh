@@ -3,9 +3,9 @@ set -e
 cdk_context="$(npm run -s cdk context -- -j)"
 
 druid_version=$(echo "$cdk_context" | grep "druidVersion" | awk '/druidVersion/{print $NF}' | tr -d '"' | tr -d ',')
-druid_version=${druid_version:-33.0.0}
+druid_version=${druid_version:-30.0.0}
 
-druid_operator_version="v1.3.0"
+druid_operator_version="v1.2.3"
 druid_operator_repo="https://github.com/datainfrahq/druid-operator"
 
 do_cmd() 
@@ -35,20 +35,20 @@ build_druid_cloudwatch()
 {
     echo "building druid cloudwatch emitter extension"
     cd DruidCloudwatchExtension && \
-       mvn clean verify package && \
+       mvn -B -q clean verify package && \
        rm -rf ../lib/docker/extensions/druid-cloudwatch/ && \
        mkdir -p ../lib/docker/extensions/druid-cloudwatch/ && \
-       cp -f target/druid-cloudwatch-33.0.0-jar-with-dependencies.jar ../lib/docker/extensions/druid-cloudwatch/ && cd ..
+       cp -f target/druid-cloudwatch-25.0.0-jar-with-dependencies.jar ../lib/docker/extensions/druid-cloudwatch/ && cd ..
 }
 
 build_druid_oidc()
 {
     echo "building druid oidc extension"
     cd DruidOidcExtension && \
-       mvn clean verify package && \
+       mvn -B -q clean verify package && \
        rm -rf ../lib/docker/extensions/druid-oidc/ && \
        mkdir -p ../lib/docker/extensions/druid-oidc/ && \
-       cp -f target/druid-oidc-33.0.0-jar-with-dependencies.jar ../lib/docker/extensions/druid-oidc/
+       cp -f target/druid-oidc-29.0.1-jar-with-dependencies.jar ../lib/docker/extensions/druid-oidc/
 }
 
 download_druid_operator()
@@ -59,15 +59,13 @@ download_druid_operator()
         mv ./druid-operator/chart ./lib/druid-operator-chart && rm -rf ./druid-operator
 }
 
-
 download_and_verify_file() 
 {
     local version=$1
     local download_url=$2
-    local alt_url=$3
-    local target_directory=$4
-    local target_filename=$5
-    
+    local target_directory=$3
+    local target_filename=$4
+
     mkdir -p "$target_directory"
     local file_path="${target_directory}/${target_filename}-${version}-bin.tar.gz"
     local checksum_url="${download_url}.sha512"
@@ -75,43 +73,33 @@ download_and_verify_file()
     if [ -f "$file_path" ]; then
         echo "$file_path exists, skip downloading"
     else
-        if curl -f -o "$file_path" "$download_url"; then
-            echo "Successfully downloaded file from primary URL."
-            checksum_url="${download_url}.sha512"
-        else
-            echo "Primary download failed. Attempting alternative URL..."
-            curl -f -o "$file_path" "$alt_url"  
-            checksum_url="${alt_url}.sha512"          
-        fi
+        curl -f -o "$file_path" "$download_url"
+    fi
 
-        if [ ! -f "${file_path}.sha512" ]; then
-            curl -o "${file_path}.sha512" "$checksum_url"
-        fi
+    if [ ! -f "${file_path}.sha512" ]; then
+        curl -o "${file_path}.sha512" "$checksum_url"
+    fi
 
-	echo "Verifying file checksum..."
-        local file_checksum=$(openssl sha512 -r "$file_path" | awk '{print $1}')
-        local file_checksum_sha512=$(cat "${file_path}.sha512" | awk '{print $1}')
-        if [ "$file_checksum" != "$file_checksum_sha512" ]; then
-            echo "Error: $target_filename file checksum does not match"
-            return 1
-        fi
+    local file_checksum=$(openssl sha512 -r "$file_path" | awk '{print $1}')
+    local file_checksum_sha512=$(cat "${file_path}.sha512" | awk '{print $1}')
+    if [ "$file_checksum" != "$file_checksum_sha512" ]; then
+        echo "Error: $target_filename file checksum does not match"
+        return 1
     fi
 }
 
 download_druid() 
 {
     download_url="https://archive.apache.org/dist/druid/${druid_version}/apache-druid-${druid_version}-bin.tar.gz"
-    alt_url="https://dlcdn.apache.org/druid/${druid_version}/apache-druid-${druid_version}-bin.tar.gz"
-    download_and_verify_file "$druid_version" "$download_url" "$alt_url" "./druid-bin" "apache-druid"
+    download_and_verify_file "$druid_version" "$download_url" "./druid-bin" "apache-druid"
 }
 
 download_zookeeper() 
 {
     local zookeeper_version=$(echo "$cdk_context"  | grep "zookeeperVersion" | awk '/zookeeperVersion/{print $NF}' | tr -d '"' | tr -d ',')
-    zookeeper_version=${zookeeper_version:-3.9.3}
+    zookeeper_version=${zookeeper_version:-3.8.4}
     download_url="https://archive.apache.org/dist/zookeeper/zookeeper-${zookeeper_version}/apache-zookeeper-${zookeeper_version}-bin.tar.gz"
-    alt_url="https://dlcdn.apache.org/zookeeper/zookeeper-${zookeeper_version}/apache-zookeeper-${zookeeper_version}-bin.tar.gz"
-    download_and_verify_file "$zookeeper_version" "$download_url" "$alt_url" "./zookeeper-bin" "apache-zookeeper"
+    download_and_verify_file "$zookeeper_version" "$download_url" "./zookeeper-bin" "apache-zookeeper"
 }
 
 download_rds_ca_bundle()

@@ -83,8 +83,7 @@ public class DruidMonitoringMetricsFactoryTest {
         ServiceMetricEvent metricEvent = metricEventBuilder
                 .setDimension("key1", "value1")
                 .setDimension("key2", "value2")
-                .setMetric("task/success/count", 1)
-                .setCreatedTime(metricCreateTime)
+                .build(metricCreateTime, "task/success/count",  1)
                 .build("some-service", "some-task");
         
         // Act

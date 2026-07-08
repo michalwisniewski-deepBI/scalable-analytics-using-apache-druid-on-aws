@@ -9,65 +9,40 @@ useradd -m -U ${USER_NAME}
 
 if [[ ! -z $YUM_CMD ]]; then
     echo " >>druid>> installing yum dependencies $(date)"
-    STEP_SUCCESS=false
-    RETRIES=0
-    while [ "$STEP_SUCCESS" == false ] && [ $RETRIES -lt 5 ]; do
-        RETRIES=$((RETRIES+1))
-        sudo yum update -y
-        if [ $? -eq 0 ]; then
-            STEP_SUCCESS=true
-        fi
-    done
-    STEP_SUCCESS=false
-    RETRIES=0
-    while [ "$STEP_SUCCESS" == false ] && [ $RETRIES -lt 5 ]; do
-        RETRIES=$((RETRIES+1))
-        sudo yum install -y java-17-amazon-corretto nc jq amazon-cloudwatch-agent nvme-cli
-        if [ $? -eq 0 ]; then
-            STEP_SUCCESS=true
-        fi
-    done
-    STEP_SUCCESS=false
-    RETRIES=0
-    while [ "$STEP_SUCCESS" == false ] && [ $RETRIES -lt 5 ]; do
-        RETRIES=$((RETRIES+1))
-        sudo yum install -y python3.12 python3.12-pip
-        if [ $? -eq 0 ]; then
-            STEP_SUCCESS=true
-        fi
-    done
-    PYTHON=python3.12
+    yum update -y && \
+        yum install -y java-11-amazon-corretto nc jq amazon-cloudwatch-agent nvme-cli && \
+        amazon-linux-extras install python3.8
+    PYTHON=python3.8
 elif [[ ! -z $APT_CMD ]]; then
-    echo " >>druid>> installing apt-get dependencies $(date)"
-    apt-get update
-    while apt-get install openjdk-17-jdk jq python3-pip nvme-cli --yes; [[ $? -ne 0 ]];
-    do
-        echo " >>druid>> waiting for apt lock. Will retry in 5 seconds. $(date)"
-        sleep 5
-    done
+    # Only install apt/pip deps if not already present (e.g. pre-baked in AMI).
+    # On Ubuntu 22 the Atlassian golden AMI points apt and pip at packages.atlassian.com
+    # which may be unreachable in restricted network environments (e.g. FedRAMP VPC).
+    if ! command -v cfn-signal >/dev/null 2>&1; then
+        echo " >>druid>> installing apt-get dependencies $(date)"
+        apt-get update
+        while apt-get install openjdk-11-jdk jq python3-pip nvme-cli --yes; [[ $? -ne 0 ]];
+        do
+            echo " >>druid>> waiting for apt lock. Will retry in 5 seconds. $(date)"
+            sleep 5
+        done
 
-    wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/{{CPU_ARCHITECTURE}}/latest/amazon-cloudwatch-agent.deb
-    dpkg -i -E ./amazon-cloudwatch-agent.deb
+        wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/{{CPU_ARCHITECTURE}}/latest/amazon-cloudwatch-agent.deb
+        dpkg -i -E ./amazon-cloudwatch-agent.deb
 
-    pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-    chmod +x /usr/local/bin/cfn-*
+        pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+        chmod +x /usr/local/bin/cfn-*
+
+        python3 -m pip install -U pip
+        python3 -m pip install --no-input boto3 botocore requests jinja2 py-cpuinfo awscli supervisor tenacity
+    else
+        echo " >>druid>> apt/pip deps already present (pre-baked in AMI), skipping install $(date)"
+    fi
     PYTHON=python3
 fi
 export PATH=$PATH:/usr/local/bin:/opt/aws/bin
 
-echo " >>druid>> installing python dependencies $(date)"
-$PYTHON -m pip install -U pip
-$PYTHON -m pip install --no-input boto3 botocore requests jinja2 py-cpuinfo awscli supervisor tenacity
-if [[ ! -z $YUM_CMD ]]; then
-	chmod +x /usr/bin/aws
-	chmod +x /usr/local/bin/supervisord
-	sudo yum install cronie -y
-	sudo systemctl enable crond.service
-	sudo systemctl start crond.service
-elif [[ ! -z $APT_CMD ]]; then
-	chmod +x /usr/local/bin/aws
-	chmod +x /usr/local/bin/supervisord
-fi
+chmod +x /usr/local/bin/aws
+chmod +x /usr/local/bin/supervisord
 
 export AWS_REGION={{REGION}}
 export AWS_DEFAULT_REGION={{REGION}}
@@ -102,7 +77,7 @@ echo " >>druid>> starting CloudWatch agent $(date)"
 sed -i \
     -e "s|<DRUID_COMPONENT>|{{DRUID_COMPONENT}}|g" \
     -e "s|<DRUID_CLUSTER_NAME>|{{DRUID_CLUSTER_NAME}}|g" \
-    -e "s|<AWS_REGION>|$AWS_REGION|g" \
+    -e "s|<AWS_REGION>|AWS_REGION|g" \
     -e "s|<FIPS_ENDPOINT>|$($AWS_USE_FIPS_ENDPOINT && echo -fips)|g" \
     $DRUID_SOLUTION_CONFIG/cloudwatch-agent/amazon-cloudwatch-agent.json
 /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:$DRUID_SOLUTION_CONFIG/cloudwatch-agent/amazon-cloudwatch-agent.json
@@ -110,13 +85,25 @@ sed -i \
 cp -rf $DRUID_SOLUTION_CONFIG/_common $DRUID_CLUSTER_CONFIG/
 
 mkdir -p $DRUID_HOME/conf/supervisor/supervisord.d/ /var/log/supervisor/
-cp -f $DRUID_SOLUTION_CONFIG/systemd/system/supervisord.conf $DRUID_HOME/conf/supervisor/supervisord.conf
-cp -f $DRUID_SOLUTION_CONFIG/systemd/system/supervisord.service $DRUID_HOME/conf/supervisor/supervisord.service
+cp -f $DRUID_SOLUTION_CONFIG/supervisor/supervisord.conf $DRUID_HOME/conf/supervisor/supervisord.conf
 
 echo " >>druid>> creating keystore and trust store for internal TLS certificates $(date)"
 export RANDFILE=/tmp/.rnd
 export TLS_KEYSTORE_PASSWORD=$(openssl rand -base64 48 | cut -c1-"24")
-bash $DRUID_HOME/scripts/setup_tls_certificates.sh $DRUID_HOME/tls-certificates {{TLS_CERTIFICATE_SECRET_NAME}} "$TLS_KEYSTORE_PASSWORD"
+if [ -r /etc/os-release ]; then
+    . /etc/os-release
+fi
+
+if [ "${ID:-}" = "ubuntu" ] && [ "${VERSION_ID:-}" = "22.04" ] && \
+   [ -r /proc/sys/crypto/fips_enabled ] && grep -qx '1' /proc/sys/crypto/fips_enabled; then
+    echo " >>druid>> using Ubuntu 22.04 FIPS TLS setup script $(date)"
+    bash $DRUID_HOME/scripts/setup_tls_certificates2204fips.sh \
+        $DRUID_HOME/tls-certificates {{TLS_CERTIFICATE_SECRET_NAME_PEM}} "$TLS_KEYSTORE_PASSWORD"
+else
+    echo " >>druid>> using default TLS setup script $(date)"
+    bash $DRUID_HOME/scripts/setup_tls_certificates.sh \
+        $DRUID_HOME/tls-certificates {{TLS_CERTIFICATE_SECRET_NAME}} "$TLS_KEYSTORE_PASSWORD"
+fi
 
 echo " >>druid>> retrieving AWS secrets $(date)"
 RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id {{RDS_SECRET_NAME}} --output text --query SecretString)
