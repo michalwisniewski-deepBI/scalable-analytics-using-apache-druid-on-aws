@@ -115,6 +115,7 @@ export class DruidEc2Stack extends DruidStack {
       this.baseInfra,
       rdsMetadataConstruct,
       certificateGenerator.TlsCertificate,
+      certificateGenerator.TlsCertificatePem,
       manualTlsCertificatePem,
     );
 
@@ -213,7 +214,8 @@ export class DruidEc2Stack extends DruidStack {
       customAmi: props.customAmi,
       solutionVersion: props.solutionVersion,
       tlsCertificateSecretName: certificateGenerator.TlsCertificate.secretName,
-      tlsCertificateSecretNamePem: MANUAL_TLS_CERTIFICATE_SECRET_NAME_PEM,
+      tlsCertificateSecretNamePem:
+        certificateGenerator.TlsCertificatePem.secretName,
     };
 
     // create data tiers
@@ -623,6 +625,7 @@ export class DruidEc2Stack extends DruidStack {
     rdsMetadataConstruct: MetadataStore,
     tlsCertificate: ISecret,
     tlsCertificatePem: ISecret,
+    manualTlsCertificatePem?: ISecret,
   ): iam.IRole {
     const role = new iam.Role(this, "EC2InstanceRole", {
       managedPolicies: [
@@ -718,6 +721,7 @@ export class DruidEc2Stack extends DruidStack {
     baseInfra.oidcIdpClientSecret?.grantRead(role);
     tlsCertificate.grantRead(role);
     tlsCertificatePem.grantRead(role);
+    manualTlsCertificatePem?.grantRead(role);
 
     return role;
   }
