@@ -52,12 +52,16 @@ import { Construct } from "constructs";
 import { DruidAlarms, commonAlarmProps } from "../constructs/druidAlarm";
 import { DruidStack } from "./druidStack";
 import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { InternalCertificateAuthority } from "../constructs/internalCertificateAuthority";
 import { LoadBalancerTarget } from "aws-cdk-lib/aws-route53-targets";
 import { MetadataStore } from "../constructs/metadataStore";
 import { OperationalMetricsCollection } from "../constructs/operationalMetricCollection";
 import { RetentionConfig } from "../constructs/retentionConfig";
 import { ZooKeeper } from "../constructs/zookeeper";
+
+const MANUAL_TLS_CERTIFICATE_SECRET_NAME_PEM =
+  "druid/tls/intermediate-ubuntu2204-fips";
 
 /**
  * This class build Druid Stack. Creates Autoscaling group for overlord, middleManager, coordinator, query, historical and zookeeper and launches them in EC2.
@@ -81,6 +85,11 @@ export class DruidEc2Stack extends DruidStack {
       {
         vpc: this.baseInfra.vpc,
       },
+    );
+    const manualTlsCertificatePem = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      "manual-tls-certificate-pem",
+      MANUAL_TLS_CERTIFICATE_SECRET_NAME_PEM,
     );
 
     const ec2Config = props.clusterParams.hostingConfig as Ec2Config;
@@ -106,7 +115,7 @@ export class DruidEc2Stack extends DruidStack {
       this.baseInfra,
       rdsMetadataConstruct,
       certificateGenerator.TlsCertificate,
-      certificateGenerator.TlsCertificatePem,
+      manualTlsCertificatePem,
     );
 
     const appLoadBalancer = new elb.ApplicationLoadBalancer(
@@ -204,8 +213,7 @@ export class DruidEc2Stack extends DruidStack {
       customAmi: props.customAmi,
       solutionVersion: props.solutionVersion,
       tlsCertificateSecretName: certificateGenerator.TlsCertificate.secretName,
-      tlsCertificateSecretNamePem:
-        certificateGenerator.TlsCertificatePem.secretName,
+      tlsCertificateSecretNamePem: MANUAL_TLS_CERTIFICATE_SECRET_NAME_PEM,
     };
 
     // create data tiers
