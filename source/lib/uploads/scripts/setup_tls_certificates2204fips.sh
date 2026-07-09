@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/tls_san_utils.sh"
+
 # TLS bootstrap for Ubuntu 22.04 with FIPS enabled.
 # Expects Secrets Manager SecretBinary: tar.gz bundle containing:
 # - ca.cert.pem
@@ -125,23 +128,16 @@ if [ "$CERT_PUB_SHA" != "$KEY_PUB_SHA" ]; then
     exit 1
 fi
 
-SAN_KEYTOOL="SAN=dns:$HOSTNAME"
-ALT_NAMES="DNS.1=$HOSTNAME"
-ALT_INDEX=2
-IP_INDEX=1
+extra_hostnames=()
+for candidate in "$HOSTNAME" "$LOCAL_HOSTNAME" "$(hostname 2>/dev/null || true)" "$(hostname -s 2>/dev/null || true)" "$(hostname -f 2>/dev/null || true)"; do
+    if [ -n "$candidate" ] && [ "$candidate" != "$HOSTNAME" ] && [ "$candidate" != "$LOCAL_HOSTNAME" ]; then
+        extra_hostnames+=("$candidate")
+    fi
+done
 
-if [ -n "$LOCAL_HOSTNAME" ] && [ "$LOCAL_HOSTNAME" != "$HOSTNAME" ]; then
-    SAN_KEYTOOL="$SAN_KEYTOOL,dns:$LOCAL_HOSTNAME"
-    ALT_NAMES="$ALT_NAMES
-DNS.$ALT_INDEX=$LOCAL_HOSTNAME"
-    ALT_INDEX=$((ALT_INDEX + 1))
-fi
-
-if [ -n "$LOCAL_IPV4" ]; then
-    SAN_KEYTOOL="$SAN_KEYTOOL,ip:$LOCAL_IPV4"
-    ALT_NAMES="$ALT_NAMES
-IP.$IP_INDEX=$LOCAL_IPV4"
-fi
+build_san_entries "$HOSTNAME" "$LOCAL_HOSTNAME" "$LOCAL_IPV4" "${extra_hostnames[@]}"
+SAN_KEYTOOL="$SAN_KEYTOOL"
+ALT_NAMES="$ALT_NAMES"
 
 keytool -genkeypair \
     -alias druid \
