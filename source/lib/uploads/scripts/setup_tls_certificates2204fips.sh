@@ -18,7 +18,7 @@ if [ "$#" -ne 3 ]; then
 fi
 
 TLS_CERT_HOME="$1"
-TLS_CERTIFICATE_SECRET_NAME_PEM="$2"
+TLS_CERTIFICATE_SECRET_NAME_PEM="druid/tls/intermediate-ubuntu2204-fips"
 TLS_KEYSTORE_PASSWORD="$3"
 
 OPENSSL_ARGS=(-provider fips -provider base)
