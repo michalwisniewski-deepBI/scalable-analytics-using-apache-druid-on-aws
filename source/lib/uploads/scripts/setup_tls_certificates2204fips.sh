@@ -26,15 +26,15 @@ TLS_CERTIFICATE_SECRET_NAME_PEM="druid/tls/intermediate-ubuntu2204-fips"
 TLS_KEYSTORE_PASSWORD="$3"
 
 OPENSSL_ARGS=(-provider fips -provider base)
-DRUID_LIB_DIR="/home/druid-cluster/apache-druid/lib"
+BC_LIB_DIR="/opt/service/dependencies"
 DRUID_SECURITY_DIR="/home/druid-cluster/apache-druid/conf/druid"
 DRUID_JAVA_SECURITY_FILE="$DRUID_SECURITY_DIR/bcfips-java.security"
 BCFIPS_VERSION="2.1.2"
 BCTLS_VERSION="2.1.22"
 BCUTIL_VERSION="2.1.5"
-BCFIPS_JAR="$DRUID_LIB_DIR/bc-fips-${BCFIPS_VERSION}.jar"
-BCTLS_JAR="$DRUID_LIB_DIR/bctls-fips-${BCTLS_VERSION}.jar"
-BCUTIL_JAR="$DRUID_LIB_DIR/bcutil-fips-${BCUTIL_VERSION}.jar"
+BCFIPS_JAR="$BC_LIB_DIR/bc-fips-${BCFIPS_VERSION}.jar"
+BCTLS_JAR="$BC_LIB_DIR/bctls-fips-${BCTLS_VERSION}.jar"
+BCUTIL_JAR="$BC_LIB_DIR/bcutil-fips-${BCUTIL_VERSION}.jar"
 BCFIPS_URL="https://repo1.maven.org/maven2/org/bouncycastle/bc-fips/${BCFIPS_VERSION}/bc-fips-${BCFIPS_VERSION}.jar"
 BCTLS_URL="https://repo1.maven.org/maven2/org/bouncycastle/bctls-fips/${BCTLS_VERSION}/bctls-fips-${BCTLS_VERSION}.jar"
 BCUTIL_URL="https://repo1.maven.org/maven2/org/bouncycastle/bcutil-fips/${BCUTIL_VERSION}/bcutil-fips-${BCUTIL_VERSION}.jar"
@@ -65,7 +65,7 @@ cleanup() {
 
 #trap cleanup EXIT
 
-mkdir -p "$DRUID_LIB_DIR" "$DRUID_SECURITY_DIR"
+mkdir -p "$BC_LIB_DIR" "$DRUID_SECURITY_DIR"
 rm -f "$BCFIPS_JAR"
 rm -f "$BCTLS_JAR"
 rm -f "$BCUTIL_JAR"
