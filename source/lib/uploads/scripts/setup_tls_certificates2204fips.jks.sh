@@ -13,7 +13,7 @@ source "$SCRIPT_DIR/tls_san_utils.sh"
 # - druid-int22.cert.pem
 # - druid-int22.key.pem
 #
-# usage: setup_tls_certificates2204fips.sh TLS_CERT_HOME TLS_CERTIFICATE_SECRET_NAME_PEM TLS_KEYSTORE_PASSWORD
+# usage: setup_tls_certificates2204fips.jks.sh TLS_CERT_HOME TLS_CERTIFICATE_SECRET_NAME_PEM TLS_KEYSTORE_PASSWORD
 
 if [ "$#" -ne 3 ]; then
     echo "Usage: $0 TLS_CERT_HOME TLS_CERTIFICATE_SECRET_NAME_PEM TLS_KEYSTORE_PASSWORD"
@@ -26,23 +26,6 @@ TLS_CERTIFICATE_SECRET_NAME_PEM="druid/tls/intermediate-ubuntu2204-fips"
 TLS_KEYSTORE_PASSWORD="$3"
 
 OPENSSL_ARGS=(-provider fips -provider base)
-DRUID_LIB_DIR="/home/druid-cluster/apache-druid/lib"
-DRUID_SECURITY_DIR="/home/druid-cluster/apache-druid/conf/druid"
-DRUID_JAVA_SECURITY_FILE="$DRUID_SECURITY_DIR/bcfips-java.security"
-BCFIPS_VERSION="2.1.2"
-BCTLS_VERSION="2.1.22"
-BCUTIL_VERSION="2.1.5"
-BCFIPS_JAR="$DRUID_LIB_DIR/bc-fips-${BCFIPS_VERSION}.jar"
-BCTLS_JAR="$DRUID_LIB_DIR/bctls-fips-${BCTLS_VERSION}.jar"
-BCUTIL_JAR="$DRUID_LIB_DIR/bcutil-fips-${BCUTIL_VERSION}.jar"
-BCFIPS_URL="https://repo1.maven.org/maven2/org/bouncycastle/bc-fips/${BCFIPS_VERSION}/bc-fips-${BCFIPS_VERSION}.jar"
-BCTLS_URL="https://repo1.maven.org/maven2/org/bouncycastle/bctls-fips/${BCTLS_VERSION}/bctls-fips-${BCTLS_VERSION}.jar"
-BCUTIL_URL="https://repo1.maven.org/maven2/org/bouncycastle/bcutil-fips/${BCUTIL_VERSION}/bcutil-fips-${BCUTIL_VERSION}.jar"
-BCFIPS_CLASS="org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider"
-KEYTOOL_PROVIDER_ARGS=(
-    -providerclass "$BCFIPS_CLASS"
-    -providerpath "$BCFIPS_JAR"
-)
 
 BUNDLE_FILE="$TLS_CERT_HOME/druid-int22-ca-bundle.tar.gz"
 LEAF_EXT_FILE="$TLS_CERT_HOME/leaf.ext"
@@ -65,22 +48,6 @@ cleanup() {
 
 #trap cleanup EXIT
 
-mkdir -p "$DRUID_LIB_DIR" "$DRUID_SECURITY_DIR"
-rm -f "$BCFIPS_JAR"
-rm -f "$BCTLS_JAR"
-rm -f "$BCUTIL_JAR"
-wget -q -O "$BCFIPS_JAR" "$BCFIPS_URL"
-wget -q -O "$BCTLS_JAR" "$BCTLS_URL"
-wget -q -O "$BCUTIL_JAR" "$BCUTIL_URL"
-
-cat > "$DRUID_JAVA_SECURITY_FILE" <<EOF
-security.provider.1=org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider C:HYBRID;DEFRND[local];ENABLE{ALL};
-security.provider.2=org.bouncycastle.jsse.provider.BouncyCastleJsseProvider fips:BCFIPS
-security.provider.3=SUN
-securerandom.strongAlgorithms=NativePRNGBlocking:SUN
-securerandom.source=file:/dev/random
-EOF
-
 TOKEN=$(curl -fsS -X PUT \
     "http://169.254.169.254/latest/api/token" \
     -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
@@ -94,25 +61,10 @@ LOCAL_IPV4=$(curl -fsS \
     -H "X-aws-ec2-metadata-token: $TOKEN" \
     http://169.254.169.254/latest/meta-data/local-ipv4 || true)
 
-if [ ! -s "$BCFIPS_JAR" ]; then
-    echo "Missing BCFIPS jar: $BCFIPS_JAR"
-    exit 1
-fi
-
-if [ ! -s "$BCTLS_JAR" ]; then
-    echo "Missing BCTLS jar: $BCTLS_JAR"
-    exit 1
-fi
-
-if [ ! -s "$BCUTIL_JAR" ]; then
-    echo "Missing BCUTIL jar: $BCUTIL_JAR"
-    exit 1
-fi
-
 mkdir -p "$TLS_CERT_HOME"
 cd "$TLS_CERT_HOME"
 
-rm -f keystore.bcfks truststore.bcfks
+rm -f keystore.jks truststore.jks
 
 aws secretsmanager get-secret-value \
     --secret-id "$TLS_CERTIFICATE_SECRET_NAME_PEM" \
@@ -193,8 +145,8 @@ keytool -genkeypair \
     -keyalg RSA \
     -keysize 2048 \
     -sigalg SHA256withRSA \
-    -keystore keystore.bcfks \
-    -storetype BCFKS \
+    -keystore keystore.jks \
+    -storetype JKS \
     -storepass "$TLS_KEYSTORE_PASSWORD" \
     -keypass "$TLS_KEYSTORE_PASSWORD" \
     -dname "CN=$HOSTNAME" \
@@ -202,20 +154,18 @@ keytool -genkeypair \
     -ext "KU=digitalSignature,keyEncipherment" \
     -ext "EKU=serverAuth,clientAuth" \
     -ext "$SAN_KEYTOOL" \
-    "${KEYTOOL_PROVIDER_ARGS[@]}" \
     -noprompt
 
 keytool -certreq \
     -alias druid \
-    -keystore keystore.bcfks \
-    -storetype BCFKS \
+    -keystore keystore.jks \
+    -storetype JKS \
     -storepass "$TLS_KEYSTORE_PASSWORD" \
     -file druid.csr \
     -sigalg SHA256withRSA \
     -ext "KU=digitalSignature,keyEncipherment" \
     -ext "EKU=serverAuth,clientAuth" \
-    -ext "$SAN_KEYTOOL" \
-    "${KEYTOOL_PROVIDER_ARGS[@]}"
+    -ext "$SAN_KEYTOOL"
 
 cat > "$LEAF_EXT_FILE" <<EOF
 basicConstraints=critical,CA:false
@@ -250,56 +200,49 @@ openssl verify "${OPENSSL_ARGS[@]}" \
 keytool -importcert \
     -alias root-ca \
     -file ca.cert.pem \
-    -keystore keystore.bcfks \
-    -storetype BCFKS \
+    -keystore keystore.jks \
+    -storetype JKS \
     -storepass "$TLS_KEYSTORE_PASSWORD" \
-    "${KEYTOOL_PROVIDER_ARGS[@]}" \
     -noprompt
 
 keytool -importcert \
     -alias druid-int-ca \
     -file druid-int22.cert.pem \
-    -keystore keystore.bcfks \
-    -storetype BCFKS \
+    -keystore keystore.jks \
+    -storetype JKS \
     -storepass "$TLS_KEYSTORE_PASSWORD" \
-    "${KEYTOOL_PROVIDER_ARGS[@]}" \
     -noprompt
 
 keytool -importcert \
     -alias druid \
     -file "$DRUID_CHAIN_FILE" \
-    -keystore keystore.bcfks \
-    -storetype BCFKS \
+    -keystore keystore.jks \
+    -storetype JKS \
     -storepass "$TLS_KEYSTORE_PASSWORD" \
-    "${KEYTOOL_PROVIDER_ARGS[@]}" \
     -noprompt
 
 keytool -importcert \
     -alias root-ca \
     -file ca.cert.pem \
-    -keystore truststore.bcfks \
-    -storetype BCFKS \
+    -keystore truststore.jks \
+    -storetype JKS \
     -storepass "$TLS_KEYSTORE_PASSWORD" \
-    "${KEYTOOL_PROVIDER_ARGS[@]}" \
     -noprompt
 
 keytool -importcert \
     -alias druid-int-ca \
     -file druid-int22.cert.pem \
-    -keystore truststore.bcfks \
-    -storetype BCFKS \
+    -keystore truststore.jks \
+    -storetype JKS \
     -storepass "$TLS_KEYSTORE_PASSWORD" \
-    "${KEYTOOL_PROVIDER_ARGS[@]}" \
     -noprompt
 
 keytool -list -v \
-    -keystore keystore.bcfks \
-    -storetype BCFKS \
-    -storepass "$TLS_KEYSTORE_PASSWORD" \
-    "${KEYTOOL_PROVIDER_ARGS[@]}" >/dev/null
+    -keystore keystore.jks \
+    -storetype JKS \
+    -storepass "$TLS_KEYSTORE_PASSWORD" >/dev/null
 
 keytool -list \
-    -keystore truststore.bcfks \
-    -storetype BCFKS \
-    -storepass "$TLS_KEYSTORE_PASSWORD" \
-    "${KEYTOOL_PROVIDER_ARGS[@]}" >/dev/null
+    -keystore truststore.jks \
+    -storetype JKS \
+    -storepass "$TLS_KEYSTORE_PASSWORD" >/dev/null
