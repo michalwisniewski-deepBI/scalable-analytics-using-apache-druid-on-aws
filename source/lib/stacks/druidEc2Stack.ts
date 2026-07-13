@@ -60,7 +60,7 @@ import { OperationalMetricsCollection } from "../constructs/operationalMetricCol
 import { RetentionConfig } from "../constructs/retentionConfig";
 import { ZooKeeper } from "../constructs/zookeeper";
 
-const MANUAL_TLS_CERTIFICATE_SECRET_NAME_PEM =
+const manualTlsCertificateSecretNamePem =
   "druid/tls/intermediate-ubuntu2204-fips";
 
 /**
@@ -89,7 +89,7 @@ export class DruidEc2Stack extends DruidStack {
     const manualTlsCertificatePem = secretsmanager.Secret.fromSecretNameV2(
       this,
       "manual-tls-certificate-pem",
-      MANUAL_TLS_CERTIFICATE_SECRET_NAME_PEM,
+      manualTlsCertificateSecretNamePem,
     );
 
     const ec2Config = props.clusterParams.hostingConfig as Ec2Config;
