@@ -43,9 +43,7 @@ KEYTOOL_PROVIDER_ARGS=(
     -providerclass "$BCFIPS_CLASS"
     -providerpath "$BCFIPS_JAR"
 )
-BC_LIB_DIR="/opt/service/dependencies"
-BCFIPS_VERSION="2.1.2"
-BCFIPS_JAR="$BC_LIB_DIR/bc-fips-${BCFIPS_VERSION}.jar"
+
 BUNDLE_FILE="$TLS_CERT_HOME/druid-int22-ca-bundle.tar.gz"
 LEAF_EXT_FILE="$TLS_CERT_HOME/leaf.ext"
 CA_CHAIN_FILE="$TLS_CERT_HOME/ca-chain.pem"
@@ -89,12 +87,12 @@ TOKEN=$(curl -fsS -X PUT \
 HOSTNAME=$(curl -fsS \
     -H "X-aws-ec2-metadata-token: $TOKEN" \
     http://169.254.169.254/latest/meta-data/hostname)
-##LOCAL_HOSTNAME=$(curl -fsS \
-##    -H "X-aws-ec2-metadata-token: $TOKEN" \
-##    http://169.254.169.254/latest/meta-data/local-hostname || true)
-##LOCAL_IPV4=$(curl -fsS \
-##    -H "X-aws-ec2-metadata-token: $TOKEN" \
-##    http://169.254.169.254/latest/meta-data/local-ipv4 || true)
+LOCAL_HOSTNAME=$(curl -fsS \
+    -H "X-aws-ec2-metadata-token: $TOKEN" \
+    http://169.254.169.254/latest/meta-data/local-hostname || true)
+LOCAL_IPV4=$(curl -fsS \
+    -H "X-aws-ec2-metadata-token: $TOKEN" \
+    http://169.254.169.254/latest/meta-data/local-ipv4 || true)
 
 if [ ! -s "$BCFIPS_JAR" ]; then
     echo "Missing BCFIPS jar: $BCFIPS_JAR"
@@ -179,16 +177,16 @@ if [ "$CERT_PUB_SHA" != "$KEY_PUB_SHA" ]; then
     exit 1
 fi
 
-##extra_hostnames=()
-##for candidate in "$HOSTNAME" "$LOCAL_HOSTNAME" "$(hostname 2>/dev/null || true)" "$(hostname -s 2>/dev/null || true)" "$(hostname -f 2>/dev/null || true)"; do
-##    if [ -n "$candidate" ] && [ "$candidate" != "$HOSTNAME" ] && [ "$candidate" != "$LOCAL_HOSTNAME" ]; then
-##        extra_hostnames+=("$candidate")
-##    fi
-##done
+extra_hostnames=()
+for candidate in "$HOSTNAME" "$LOCAL_HOSTNAME" "$(hostname 2>/dev/null || true)" "$(hostname -s 2>/dev/null || true)" "$(hostname -f 2>/dev/null || true)"; do
+    if [ -n "$candidate" ] && [ "$candidate" != "$HOSTNAME" ] && [ "$candidate" != "$LOCAL_HOSTNAME" ]; then
+        extra_hostnames+=("$candidate")
+    fi
+done
 
-##build_san_entries "$HOSTNAME" "$LOCAL_HOSTNAME" "$LOCAL_IPV4" "${extra_hostnames[@]}"
-##SAN_KEYTOOL="$SAN_KEYTOOL"
-##ALT_NAMES="$ALT_NAMES"
+build_san_entries "$HOSTNAME" "$LOCAL_HOSTNAME" "$LOCAL_IPV4" "${extra_hostnames[@]}"
+SAN_KEYTOOL="$SAN_KEYTOOL"
+ALT_NAMES="$ALT_NAMES"
 
 keytool -genkeypair \
     -alias druid \
@@ -201,9 +199,9 @@ keytool -genkeypair \
     -keypass "$TLS_KEYSTORE_PASSWORD" \
     -dname "CN=$HOSTNAME" \
     -validity 365 \
-#    -ext "KU=digitalSignature,keyEncipherment" \
-#    -ext "EKU=serverAuth,clientAuth" \
-#    -ext "$SAN_KEYTOOL" \
+    -ext "KU=digitalSignature,keyEncipherment" \
+    -ext "EKU=serverAuth,clientAuth" \
+    -ext "$SAN_KEYTOOL" \
     "${KEYTOOL_PROVIDER_ARGS[@]}" \
     -noprompt
 
@@ -214,20 +212,20 @@ keytool -certreq \
     -storepass "$TLS_KEYSTORE_PASSWORD" \
     -file druid.csr \
     -sigalg SHA256withRSA \
-#    -ext "KU=digitalSignature,keyEncipherment" \
-#    -ext "EKU=serverAuth,clientAuth" \
-#    -ext "$SAN_KEYTOOL" \
+    -ext "KU=digitalSignature,keyEncipherment" \
+    -ext "EKU=serverAuth,clientAuth" \
+    -ext "$SAN_KEYTOOL" \
     "${KEYTOOL_PROVIDER_ARGS[@]}"
 
-##cat > "$LEAF_EXT_FILE" <<EOF
-##basicConstraints=critical,CA:false
-##keyUsage=critical,digitalSignature,keyEncipherment
-##extendedKeyUsage=serverAuth,clientAuth
-##subjectAltName=@alt_names
+cat > "$LEAF_EXT_FILE" <<EOF
+basicConstraints=critical,CA:false
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth,clientAuth
+subjectAltName=@alt_names
 
-##[alt_names]
-##$ALT_NAMES
-##EOF
+[alt_names]
+$ALT_NAMES
+EOF
 
 SERIAL_HEX=$(openssl rand "${OPENSSL_ARGS[@]}" -hex 16)
 
@@ -240,7 +238,7 @@ openssl x509 -req \
     -out druid.pem \
     -days 365 \
     -sha256 \
-##    -extfile "$LEAF_EXT_FILE"
+    -extfile "$LEAF_EXT_FILE"
 
 cat druid-int22.cert.pem ca.cert.pem > "$CA_CHAIN_FILE"
 cat druid.pem druid-int22.cert.pem ca.cert.pem > "$DRUID_CHAIN_FILE"
