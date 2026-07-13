@@ -201,9 +201,6 @@ keytool -genkeypair \
     -keypass "$TLS_KEYSTORE_PASSWORD" \
     -dname "CN=$HOSTNAME" \
     -validity 365 \
-#    -ext "KU=digitalSignature,keyEncipherment" \
-#    -ext "EKU=serverAuth,clientAuth" \
-#    -ext "$SAN_KEYTOOL" \
     "${KEYTOOL_PROVIDER_ARGS[@]}" \
     -noprompt
 
@@ -214,9 +211,6 @@ keytool -certreq \
     -storepass "$TLS_KEYSTORE_PASSWORD" \
     -file druid.csr \
     -sigalg SHA256withRSA \
-#    -ext "KU=digitalSignature,keyEncipherment" \
-#    -ext "EKU=serverAuth,clientAuth" \
-#    -ext "$SAN_KEYTOOL" \
     "${KEYTOOL_PROVIDER_ARGS[@]}"
 
 ##cat > "$LEAF_EXT_FILE" <<EOF
