@@ -20,7 +20,7 @@ elif [[ ! -z $APT_CMD ]]; then
     if ! command -v cfn-signal >/dev/null 2>&1; then
         echo " >>druid>> installing apt-get dependencies $(date)"
         apt-get update
-        while apt-get install openjdk-11-jdk jq python3-pip nvme-cli wget --yes; [[ $? -ne 0 ]];
+        while apt-get install openjdk-17-jdk jq python3-pip nvme-cli wget --yes; [[ $? -ne 0 ]];
         do
             echo " >>druid>> waiting for apt lock. Will retry in 5 seconds. $(date)"
             sleep 5
