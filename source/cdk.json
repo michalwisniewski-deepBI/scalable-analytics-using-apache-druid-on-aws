@@ -42,7 +42,7 @@
         "route53HostedZoneName": "aws-deepbi.com",
         "route53HostedZoneId": "Z09151401MBKBAMEM47BN",
         "druidDomain": "druiddev.aws-deepbi.com",
-        "druidVersion": "35.0.1",
+        "druidVersion": "31.0.2",
         "druidOperationPlatform": "ec2",
         "druidClusterName": "dev",
         "internetFacing": true,
