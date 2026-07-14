@@ -48,7 +48,7 @@
         "internetFacing": true,
 	"customAmi": {
             "amd64": {
-		"name": "ubuntu-pro-fips-server/images/hvm-ssd/ubuntu-focal-20.04-amd64-pro-fips-server-20260520-7bc828d1-c072-4d33-a989-fbad50380cfb",
+		"name": "ubuntu-pro-fips-updates-server/images/hvm-ssd/ubuntu-jammy-22.04-amd64-pro-fips-updates-server-20260617-prod-y5kejmnu3wodg",
                 "owners": ["679593333241"]
             }
         },
