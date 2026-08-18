@@ -85,7 +85,7 @@ export class DruidEc2Stack extends DruidStack {
     );
     const customTlsCertificatePem = this.importCustomSecret(
       "custom-tls-certificate-pem",
-      props.clusterParams.custom_secret,
+      props.clusterParams.customSecret,
     );
     const tlsCertificateSecretPem =
       customTlsCertificatePem ?? certificateGenerator.TlsCertificatePem;
@@ -212,7 +212,7 @@ export class DruidEc2Stack extends DruidStack {
       solutionVersion: props.solutionVersion,
       tlsCertificateSecretName: certificateGenerator.TlsCertificate.secretName,
       tlsCertificateSecretNamePem:
-        props.clusterParams.custom_secret ?? tlsCertificateSecretPem.secretName,
+        props.clusterParams.customSecret ?? tlsCertificateSecretPem.secretName,
     };
 
     // create data tiers
