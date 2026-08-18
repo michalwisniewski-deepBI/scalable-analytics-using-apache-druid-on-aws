@@ -53,6 +53,14 @@ export const configScheme = {
       $id: "#/properties/tlsCertificateArn",
       description: "TLS Certificate ARN.",
     },
+    custom_secret: {
+      type: "string",
+      minLength: 1,
+      title: "Custom TLS PEM Secret",
+      $id: "#/properties/custom_secret",
+      description:
+        "Existing AWS Secrets Manager secret name or complete ARN to use for Ubuntu 22.04 FIPS TLS bootstrap.",
+    },
     route53HostedZoneName: {
       type: "string",
       minLength: 1,

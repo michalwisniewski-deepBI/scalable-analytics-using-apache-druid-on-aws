@@ -46,6 +46,7 @@
         "druidOperationPlatform": "ec2",
         "druidClusterName": "dev",
         "internetFacing": true,
+        "custom_secret": "druid/tls/intermediate-ubuntu2204-fips",
 	"customAmi": {
             "amd64": {
 		"name": "ubuntu-pro-fips-updates-server/images/hvm-ssd/ubuntu-jammy-22.04-amd64-pro-fips-updates-server-20260617-prod-y5kejmnu3wodg",

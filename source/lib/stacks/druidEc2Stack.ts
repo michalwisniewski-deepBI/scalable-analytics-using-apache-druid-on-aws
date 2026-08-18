@@ -60,9 +60,6 @@ import { OperationalMetricsCollection } from "../constructs/operationalMetricCol
 import { RetentionConfig } from "../constructs/retentionConfig";
 import { ZooKeeper } from "../constructs/zookeeper";
 
-const manualTlsCertificateSecretNamePem =
-  "druid/tls/intermediate-ubuntu2204-fips";
-
 /**
  * This class build Druid Stack. Creates Autoscaling group for overlord, middleManager, coordinator, query, historical and zookeeper and launches them in EC2.
  * Creates RDS Database
@@ -86,11 +83,12 @@ export class DruidEc2Stack extends DruidStack {
         vpc: this.baseInfra.vpc,
       },
     );
-    const manualTlsCertificatePem = secretsmanager.Secret.fromSecretNameV2(
-      this,
-      "manual-tls-certificate-pem",
-      manualTlsCertificateSecretNamePem,
+    const customTlsCertificatePem = this.importCustomSecret(
+      "custom-tls-certificate-pem",
+      props.clusterParams.custom_secret,
     );
+    const tlsCertificateSecretPem =
+      customTlsCertificatePem ?? certificateGenerator.TlsCertificatePem;
 
     const ec2Config = props.clusterParams.hostingConfig as Ec2Config;
     this.validateConfig(ec2Config);
@@ -115,8 +113,7 @@ export class DruidEc2Stack extends DruidStack {
       this.baseInfra,
       rdsMetadataConstruct,
       certificateGenerator.TlsCertificate,
-      certificateGenerator.TlsCertificatePem,
-      manualTlsCertificatePem,
+      tlsCertificateSecretPem,
     );
 
     const appLoadBalancer = new elb.ApplicationLoadBalancer(
@@ -215,7 +212,7 @@ export class DruidEc2Stack extends DruidStack {
       solutionVersion: props.solutionVersion,
       tlsCertificateSecretName: certificateGenerator.TlsCertificate.secretName,
       tlsCertificateSecretNamePem:
-        certificateGenerator.TlsCertificatePem.secretName,
+        props.clusterParams.custom_secret ?? tlsCertificateSecretPem.secretName,
     };
 
     // create data tiers
@@ -625,7 +622,6 @@ export class DruidEc2Stack extends DruidStack {
     rdsMetadataConstruct: MetadataStore,
     tlsCertificate: ISecret,
     tlsCertificatePem: ISecret,
-    manualTlsCertificatePem?: ISecret,
   ): iam.IRole {
     const role = new iam.Role(this, "EC2InstanceRole", {
       managedPolicies: [
@@ -721,9 +717,21 @@ export class DruidEc2Stack extends DruidStack {
     baseInfra.oidcIdpClientSecret?.grantRead(role);
     tlsCertificate.grantRead(role);
     tlsCertificatePem.grantRead(role);
-    manualTlsCertificatePem?.grantRead(role);
 
     return role;
+  }
+
+  private importCustomSecret(
+    id: string,
+    secretId?: string,
+  ): ISecret | undefined {
+    if (!secretId) {
+      return undefined;
+    }
+
+    return secretId.startsWith("arn:")
+      ? secretsmanager.Secret.fromSecretCompleteArn(this, id, secretId)
+      : secretsmanager.Secret.fromSecretNameV2(this, id, secretId);
   }
 
   //Security Group to add inbound rules

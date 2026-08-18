@@ -1,31 +1,31 @@
 # Intermediate CA for Ubuntu 22.04 FIPS
 
-Ten dokument opisuje pierwszy etap migracji TLS dla Druid na Ubuntu 22.04 z FIPS:
+This document describes the first stage of the TLS migration for Druid on Ubuntu 22.04 with FIPS:
 
-- intermediate CA jest generowany ręcznie poza repo,
-- podpis intermediate CA odbywa się ręcznie przy użyciu istniejącego root CA,
-- wynikowy bundle PEM jest pakowany do `tar.gz`,
-- bundle trafia do AWS Secrets Manager jako `SecretBinary`,
-- w pierwszej fazie identyfikator secreta będzie zahardcodowany w kodzie.
+- the intermediate CA is generated manually outside the repository,
+- the intermediate CA is signed manually using the existing root CA,
+- the resulting PEM bundle is packaged into `tar.gz`,
+- the bundle is uploaded to AWS Secrets Manager as `SecretBinary`,
+- in the first phase, the secret identifier will be hardcoded in the code.
 
-## Założenia
+## Assumptions
 
-- Root CA już istnieje jako `ca.p12`.
-- Root CA private key działa na Ubuntu 20.04 FIPS, ale nie nadaje się do użycia na Ubuntu 22.04 FIPS.
-- Na Ubuntu 20.04 FIPS rozpakowujesz `ca.p12` do:
+- The Root CA already exists as `ca.p12`.
+- The Root CA private key works on Ubuntu 20.04 FIPS, but it is not suitable for use on Ubuntu 22.04 FIPS.
+- On Ubuntu 20.04 FIPS, you extract `ca.p12` into:
   - `ca.cert.pem`
   - `ca.key.pem`
-- Na Ubuntu 22.04 FIPS przenosisz tylko `ca.cert.pem`.
-- Intermediate CA ma być wygenerowany na Ubuntu 22.04 FIPS.
-- W pierwszej fazie secret w AWS będzie zawierał:
+- On Ubuntu 22.04 FIPS, you transfer only `ca.cert.pem`.
+- The Intermediate CA is to be generated on Ubuntu 22.04 FIPS.
+- In the first phase, the secret in AWS will contain:
   - `ca.cert.pem`
   - `druid-int22.cert.pem`
   - `druid-int22.key.pem`
-- Plik `druid-int22.key.pem` będzie niezaszyfrowany PEM tylko do pierwszych testów.
+- The `druid-int22.key.pem` file will be an unencrypted PEM only for the initial tests.
 
-## Nazewnictwo
+## Naming
 
-Przyjmujemy poniższe nazwy:
+We use the following names:
 
 - root cert: `ca.cert.pem`
 - root key: `ca.key.pem`
@@ -35,26 +35,26 @@ Przyjmujemy poniższe nazwy:
 - extension file: `intermediate.ext`
 - bundle: `druid-int22-ca-bundle.tar.gz`
 
-## Etap 1: wygenerowanie intermediate CA na Ubuntu 22.04 FIPS
+## Stage 1: generate the intermediate CA on Ubuntu 22.04 FIPS
 
-Wykonaj te kroki na maszynie z Ubuntu 22.04 i aktywnym FIPS.
+Perform these steps on a machine running Ubuntu 22.04 with FIPS enabled.
 
-### 1. Potwierdź FIPS
+### 1. Confirm FIPS
 
 ```bash
 openssl version
 openssl list -providers
 ```
 
-Oczekujesz aktywnego providera `fips`.
+You expect the `fips` provider to be active.
 
-### 2. Ustaw argumenty OpenSSL
+### 2. Set OpenSSL arguments
 
 ```bash
 OPENSSL_ARGS=(-provider fips -provider base)
 ```
 
-### 3. Wygeneruj klucz intermediate CA
+### 3. Generate the intermediate CA key
 
 ```bash
 openssl genpkey \
@@ -64,7 +64,7 @@ openssl genpkey \
   -out druid-int22.key.pem
 ```
 
-### 4. Zweryfikuj klucz intermediate
+### 4. Verify the intermediate key
 
 ```bash
 openssl pkey \
@@ -74,9 +74,9 @@ openssl pkey \
   -check
 ```
 
-Oczekujesz wyniku równoważnego `Key is valid`.
+You expect output equivalent to `Key is valid`.
 
-### 5. Utwórz CSR intermediate
+### 5. Create the intermediate CSR
 
 ```bash
 openssl req \
@@ -88,7 +88,7 @@ openssl req \
   -subj "/CN=Druid Ubuntu 22.04 FIPS Intermediate CA"
 ```
 
-### 6. Przygotuj plik rozszerzeń CA
+### 6. Prepare the CA extensions file
 
 ```bash
 cat > intermediate.ext <<'EOF'
@@ -99,26 +99,26 @@ authorityKeyIdentifier=keyid,issuer
 EOF
 ```
 
-### 7. Przenieś do podpisania
+### 7. Transfer for signing
 
-Przenieś na host Ubuntu 20.04 FIPS:
+Transfer to the Ubuntu 20.04 FIPS host:
 
 - `druid-int22.csr.pem`
 - `intermediate.ext`
 
-Nie przenoś root private key na Ubuntu 22.04.
+Do not transfer the root private key to Ubuntu 22.04.
 
-## Etap 2: podpisanie intermediate CA na Ubuntu 20.04 FIPS
+## Stage 2: sign the intermediate CA on Ubuntu 20.04 FIPS
 
-Wykonaj te kroki na maszynie z Ubuntu 20.04 FIPS, gdzie rozpakowujesz `ca.p12` i gdzie działa wynikowy `ca.key.pem`.
+Perform these steps on the Ubuntu 20.04 FIPS machine where you extract `ca.p12` and where the resulting `ca.key.pem` works.
 
-### 1. Ustaw argumenty OpenSSL
+### 1. Set OpenSSL arguments
 
 ```bash
 OPENSSL_ARGS=(-provider fips -provider base)
 ```
 
-### 2. Rozpakuj root CA z `ca.p12`
+### 2. Extract the Root CA from `ca.p12`
 
 ```bash
 openssl pkcs12 \
@@ -138,9 +138,9 @@ openssl pkcs12 \
   -passin pass:changeit
 ```
 
-Po rozpakowaniu przenieś `ca.cert.pem` na host Ubuntu 22.04 FIPS.
+After extraction, transfer `ca.cert.pem` to the Ubuntu 22.04 FIPS host.
 
-### 3. Zweryfikuj root CA
+### 3. Verify the Root CA
 
 ```bash
 openssl x509 \
@@ -158,7 +158,7 @@ openssl pkey \
   -check
 ```
 
-### 4. Podpisz intermediate CSR root CA
+### 4. Sign the intermediate CSR with the Root CA
 
 ```bash
 SERIAL_HEX=$(openssl rand "${OPENSSL_ARGS[@]}" -hex 16)
@@ -175,7 +175,7 @@ openssl x509 -req \
   -extfile intermediate.ext
 ```
 
-### 5. Zweryfikuj intermediate cert względem root CA
+### 5. Verify the intermediate cert against the Root CA
 
 ```bash
 openssl verify \
@@ -184,7 +184,7 @@ openssl verify \
   druid-int22.cert.pem
 ```
 
-### 6. Sprawdź subject i issuer
+### 6. Check subject and issuer
 
 ```bash
 openssl x509 \
@@ -197,11 +197,11 @@ openssl x509 \
   -text
 ```
 
-## Etap 3: walidacja pary intermediate cert + key
+## Stage 3: validate the intermediate cert + key pair
 
-Po podpisaniu wróć z plikiem `druid-int22.cert.pem` na host Ubuntu 22.04 FIPS i zweryfikuj zgodność z kluczem.
+After signing, return with the `druid-int22.cert.pem` file to the Ubuntu 22.04 FIPS host and verify that it matches the key.
 
-### 1. Sprawdź cert
+### 1. Check the cert
 
 ```bash
 OPENSSL_ARGS=(-provider fips -provider base)
@@ -215,7 +215,7 @@ openssl x509 \
   -dates
 ```
 
-### 2. Sprawdź, że cert i key do siebie pasują
+### 2. Check that the cert and key match
 
 ```bash
 CERT_PUB_SHA=$(
@@ -244,15 +244,15 @@ echo "$KEY_PUB_SHA"
 test "$CERT_PUB_SHA" = "$KEY_PUB_SHA"
 ```
 
-### 3. Zbuduj chain testowy
+### 3. Build a test chain
 
 ```bash
 cat druid-int22.cert.pem ca.cert.pem > ca-chain.pem
 ```
 
-## Etap 4: spakowanie bundle do `tar.gz`
+## Stage 4: package the bundle into `tar.gz`
 
-W katalogu z trzema plikami wykonaj:
+In the directory containing the three files, run:
 
 ```bash
 tar -czf druid-int22-ca-bundle.tar.gz \
@@ -261,13 +261,13 @@ tar -czf druid-int22-ca-bundle.tar.gz \
   druid-int22.key.pem
 ```
 
-### Weryfikacja zawartości archiwum
+### Verify the archive contents
 
 ```bash
 tar -tzf druid-int22-ca-bundle.tar.gz
 ```
 
-Oczekiwana zawartość:
+Expected contents:
 
 ```text
 ca.cert.pem
@@ -275,9 +275,9 @@ druid-int22.cert.pem
 druid-int22.key.pem
 ```
 
-## Etap 5: utworzenie secreta w AWS Secrets Manager
+## Stage 5: create the secret in AWS Secrets Manager
 
-### Opcja A: nowy secret
+### Option A: new secret
 
 ```bash
 aws secretsmanager create-secret \
@@ -286,7 +286,7 @@ aws secretsmanager create-secret \
   --secret-binary fileb://druid-int22-ca-bundle.tar.gz
 ```
 
-### Opcja B: aktualizacja istniejącego secreta
+### Option B: update an existing secret
 
 ```bash
 aws secretsmanager put-secret-value \
@@ -294,21 +294,21 @@ aws secretsmanager put-secret-value \
   --secret-binary fileb://druid-int22-ca-bundle.tar.gz
 ```
 
-### Pobranie ARN/ID secreta
+### Retrieve the secret ARN/ID
 
 ```bash
 aws secretsmanager describe-secret \
   --secret-id "druid/tls/intermediate-ubuntu2204-fips"
 ```
 
-Zapisz:
+Save:
 
 - `ARN`
 - `Name`
 
-W pierwszej fazie jeden z tych identyfikatorów będzie zahardcodowany w repo.
+In the first phase, one of these identifiers will be hardcoded in the repository.
 
-## Etap 6: test odczytu secreta
+## Stage 6: test reading the secret
 
 ```bash
 aws secretsmanager get-secret-value \
@@ -318,7 +318,7 @@ aws secretsmanager get-secret-value \
   | base64 --decode > downloaded-druid-int22-ca-bundle.tar.gz
 ```
 
-Rozpakowanie:
+Unpack:
 
 ```bash
 mkdir -p downloaded-bundle
@@ -326,26 +326,26 @@ tar -xzf downloaded-druid-int22-ca-bundle.tar.gz -C downloaded-bundle
 find downloaded-bundle -maxdepth 1 -type f | sort
 ```
 
-## Oczekiwany stan końcowy dla fazy 1
+## Expected final state for phase 1
 
-Secret w AWS ma zawierać:
+The secret in AWS is expected to contain:
 
 - `ca.cert.pem`
 - `druid-int22.cert.pem`
 - `druid-int22.key.pem`
 
-Repozytorium po zmianach ma:
+After the changes, the repository is expected to:
 
-- pobierać ten bundle z AWS Secrets Manager,
-- budować leaf cert na node,
-- tworzyć `keystore.bcfks`,
-- tworzyć `truststore.bcfks`,
-- nie używać `ca.p12`,
-- nie używać `openssl pkcs12`,
-- nie używać root `ca.key.pem` na Ubuntu 22.04.
+- fetch this bundle from AWS Secrets Manager,
+- build the leaf cert on the node,
+- create `keystore.bcfks`,
+- create `truststore.bcfks`,
+- not use `ca.p12`,
+- not use `openssl pkcs12`,
+- not use the root `ca.key.pem` on Ubuntu 22.04.
 
-## Uwagi operacyjne
+## Operational notes
 
-- Faza 1 świadomie rozprowadza intermediate private key na instancje. To jest akceptowany kompromis testowy, ale nie docelowy model bezpieczeństwa.
-- Docelowo signing leaf certów powinien być centralny, bez kopiowania intermediate private key na node.
-- Dla rolling upgrade trzeba najpierw zaktualizować truststore na starych node'ach tak, aby ufały także `druid-int22.cert.pem`.
+- Phase 1 deliberately distributes the intermediate private key to instances. This is an accepted testing compromise, but not the target security model.
+- Ultimately, leaf cert signing should be centralized, without copying the intermediate private key to the node.
+- For a rolling upgrade, you first need to update the truststore on the old nodes so they also trust `druid-int22.cert.pem`.

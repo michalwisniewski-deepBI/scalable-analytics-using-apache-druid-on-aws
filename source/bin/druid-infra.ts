@@ -55,6 +55,7 @@ const contextKeys: (keyof DruidConfig)[] = [
   "route53HostedZoneName",
   "druidDomain",
   "tlsCertificateArn",
+  "custom_secret",
   "internetFacing",
   "useFipsEndpoint",
   "bastionHost",
@@ -205,6 +206,7 @@ const commonDruidClusterParams = {
   },
   internetFacing: druidConfig.internetFacing ?? true,
   enableFipsEndpoints: druidConfig.useFipsEndpoint ?? false,
+  custom_secret: druidConfig.custom_secret,
   druidRetentionRules: druidConfig.druidRetentionRules,
   druidConcurrentQueryLimit:
     druidConfig.druidConcurrentQueryLimit ?? DEFAULT_NUM_HTTP_CONNECTIONS,
