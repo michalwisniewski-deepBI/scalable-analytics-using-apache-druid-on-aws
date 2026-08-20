@@ -22,12 +22,6 @@ cd $TLS_CERT_HOME
 # Download CA from secrets manager
 aws secretsmanager get-secret-value --secret-id "$TLS_CERTIFICATE_SECRET_NAME" --output text --query SecretBinary | base64 --decode > ca.p12
 
-aws secretsmanager get-secret-value \
-    --secret-id "druid/tls/intermediate-ubuntu2204-fips" \
-    --output text \
-    --query SecretBinary | base64 --decode > "cert.tgz"
-
-
 # Convert the CA to pem
 openssl pkcs12 -in ca.p12 -out ca.pem -nodes -passin pass:changeit
 
@@ -48,7 +42,7 @@ keytool -importkeystore -destkeystore keystore.jks -srckeystore druid.p12 -srcst
 keytool -importcert -file ca.pem -alias druid -keystore truststore.jks -deststorepass $TLS_KEYSTORE_PASSWORD -noprompt
 
 # Clean up
-#rm -rf druid.*
-#rm -rf ca.*
+rm -rf druid.*
+rm -rf ca.*
 
 cd -

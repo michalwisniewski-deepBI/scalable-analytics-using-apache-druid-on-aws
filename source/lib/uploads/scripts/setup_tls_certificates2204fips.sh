@@ -21,18 +21,18 @@ set -euo pipefail
 #     alias root-ca -> trusted root CA certificate
 #
 # Usage:
-#   setup_tls_certificates2204fips.jks.sh \
+#   setup_tls_certificates2204fips.sh \
 #     TLS_CERT_HOME \
-#     TLS_CERTIFICATE_SECRET_NAME_PEM \
+#     TLS_INTERMEDIATE_CERTIFICATE_SECRET_NAME \
 #     TLS_KEYSTORE_PASSWORD
 
 if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 TLS_CERT_HOME TLS_CERTIFICATE_SECRET_NAME_PEM TLS_KEYSTORE_PASSWORD"
+    echo "Usage: $0 TLS_CERT_HOME TLS_INTERMEDIATE_CERTIFICATE_SECRET_NAME TLS_KEYSTORE_PASSWORD"
     exit 1
 fi
 
 TLS_CERT_HOME="$1"
-TLS_CERTIFICATE_SECRET_NAME_PEM="$2"
+TLS_INTERMEDIATE_CERTIFICATE_SECRET_NAME="$2"
 TLS_KEYSTORE_PASSWORD="$3"
 
 OPENSSL_ARGS=(-provider fips -provider base)
@@ -73,7 +73,7 @@ cd "$TLS_CERT_HOME"
 rm -f keystore.jks truststore.jks
 
 aws secretsmanager get-secret-value \
-    --secret-id "$TLS_CERTIFICATE_SECRET_NAME_PEM" \
+    --secret-id "$TLS_INTERMEDIATE_CERTIFICATE_SECRET_NAME" \
     --output text \
     --query SecretBinary |
     base64 --decode > "$BUNDLE_FILE"

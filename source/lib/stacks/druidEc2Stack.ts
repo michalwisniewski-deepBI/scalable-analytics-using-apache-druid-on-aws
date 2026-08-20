@@ -83,12 +83,10 @@ export class DruidEc2Stack extends DruidStack {
         vpc: this.baseInfra.vpc,
       },
     );
-    const customTlsCertificatePem = this.importCustomSecret(
-      "custom-tls-certificate-pem",
+    const customTlsIntermediateCertificate = this.importCustomSecret(
+      "custom-tls-intermediate-certificate",
       props.clusterParams.customSecret,
     );
-    const tlsCertificateSecretPem =
-      customTlsCertificatePem ?? certificateGenerator.TlsCertificatePem;
 
     const ec2Config = props.clusterParams.hostingConfig as Ec2Config;
     this.validateConfig(ec2Config);
@@ -113,7 +111,7 @@ export class DruidEc2Stack extends DruidStack {
       this.baseInfra,
       rdsMetadataConstruct,
       certificateGenerator.TlsCertificate,
-      tlsCertificateSecretPem,
+      customTlsIntermediateCertificate,
     );
 
     const appLoadBalancer = new elb.ApplicationLoadBalancer(
@@ -211,8 +209,7 @@ export class DruidEc2Stack extends DruidStack {
       customAmi: props.customAmi,
       solutionVersion: props.solutionVersion,
       tlsCertificateSecretName: certificateGenerator.TlsCertificate.secretName,
-      tlsCertificateSecretNamePem:
-        props.clusterParams.customSecret ?? tlsCertificateSecretPem.secretName,
+      tlsIntermediateCertificateSecretName: props.clusterParams.customSecret,
     };
 
     // create data tiers
@@ -621,7 +618,7 @@ export class DruidEc2Stack extends DruidStack {
     baseInfra: BaseInfrastructure,
     rdsMetadataConstruct: MetadataStore,
     tlsCertificate: ISecret,
-    tlsCertificatePem: ISecret,
+    tlsIntermediateCertificate?: ISecret,
   ): iam.IRole {
     const role = new iam.Role(this, "EC2InstanceRole", {
       managedPolicies: [
@@ -716,7 +713,7 @@ export class DruidEc2Stack extends DruidStack {
     rdsMetadataConstruct.druidInternalSystemUserSecret.grantRead(role);
     baseInfra.oidcIdpClientSecret?.grantRead(role);
     tlsCertificate.grantRead(role);
-    tlsCertificatePem.grantRead(role);
+    tlsIntermediateCertificate?.grantRead(role);
 
     return role;
   }
