@@ -13,7 +13,7 @@ druid-bin
 **/docker/extensions/**
 zookeeper-bin
 *_version.txt
-
+.ai/
 # Python build files
 .venv/
 __pycache__/
